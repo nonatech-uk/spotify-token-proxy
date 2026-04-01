@@ -18,7 +18,7 @@ SPOTIFY_TOKEN_URL = "https://accounts.spotify.com/api/token"
 SPOTIFY_AUTH_URL = "https://accounts.spotify.com/authorize"
 
 # Scopes needed by user-token consumers (mcp-spotify, etc.)
-USER_SCOPES = "user-read-private user-read-email user-read-playback-state user-modify-playback-state user-read-currently-playing user-library-read"
+USER_SCOPES = "user-read-private user-read-email user-read-playback-state user-modify-playback-state user-read-currently-playing user-library-read playlist-read-private playlist-modify-public playlist-modify-private"
 
 app = FastAPI(title="Spotify Token Proxy")
 
