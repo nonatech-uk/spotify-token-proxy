@@ -74,21 +74,16 @@ def health():
 
 @app.get("/token/user")
 def get_user_token():
-    """Return a valid user access token, refreshing if needed."""
+    """Return a valid user access token, refreshing if needed.
+
+    Prefers our own token cache (authorized with full scopes) over
+    multi-scrobbler's cached credentials (which have read-only scopes).
+    """
     global _cached_token
 
     now_ms = int(time.time() * 1000)
 
-    # Try scrobbler creds first (it may have refreshed more recently)
-    scrobbler = _read_scrobbler_creds()
-    if scrobbler and scrobbler.get("expires", 0) > now_ms + 60_000:
-        return {
-            "access_token": scrobbler["token"],
-            "token_type": "Bearer",
-            "expires_in": int((scrobbler["expires"] - now_ms) / 1000),
-        }
-
-    # Try our own cache
+    # Prefer our own cache — it has the full scope set
     if _cached_token and _cached_token.get("expires", 0) > now_ms + 60_000:
         return {
             "access_token": _cached_token["access_token"],
@@ -96,14 +91,27 @@ def get_user_token():
             "expires_in": int((_cached_token["expires"] - now_ms) / 1000),
         }
 
-    # Need to refresh — get refresh token from scrobbler or our cache
+    # Try on-disk cache
+    cache = _read_token_cache()
+    if cache and cache.get("expires", 0) > now_ms + 60_000:
+        _cached_token = {
+            "access_token": cache["access_token"],
+            "expires": cache["expires"],
+        }
+        return {
+            "access_token": cache["access_token"],
+            "token_type": "Bearer",
+            "expires_in": int((cache["expires"] - now_ms) / 1000),
+        }
+
+    # Need to refresh — prefer our own refresh token (full scopes)
     refresh_tok = None
-    if scrobbler:
-        refresh_tok = scrobbler.get("refreshToken")
+    if cache:
+        refresh_tok = cache.get("refresh_token")
     if not refresh_tok:
-        cache = _read_token_cache()
-        if cache:
-            refresh_tok = cache.get("refresh_token")
+        scrobbler = _read_scrobbler_creds()
+        if scrobbler:
+            refresh_tok = scrobbler.get("refreshToken")
 
     if not refresh_tok:
         raise HTTPException(503, "No refresh token available. Run /authorize to set up OAuth.")
